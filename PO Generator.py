@@ -113,6 +113,61 @@ def generate_pdf(selected_products, meta_data):
     pdf_file = "selected_products_report.pdf"
     c = canvas.Canvas(pdf_file, pagesize=letter)
     
+    # Load and position company logo if available
+    company_logo_path = "logo.jpg"
+    if company_logo_path:
+        try:
+            company_logo = ImageReader(company_logo_path)
+
+            #Resize the image
+            logo_width, logo_height = company_logo.getSize()
+            logo_width = logo_width / 7
+            logo_height = logo_height / 7
+
+            #Center the image on the page
+            page_width, page_height = letter
+            x = (page_width - logo_width) / 2
+            y = (page_height - logo_height)
+    
+            # Draw the image on the canvas
+            c.drawImage(company_logo, x, y, width=logo_width, height=logo_height)
+    
+        except Exception as e:
+            print(f"Failed to load company logo: {e}")
+
+    # Set the font and size for the title text
+    c.setFont("Helvetica-Bold", 12)
+    
+    # Define the title text and its position
+    title_text = "PURCHASE ORDER"
+    title_x = 500  # Adjust this value for horizontal position
+    title_y = 750  # Adjust this value for vertical position
+    
+    # Draw the title text on the canvas
+    c.drawString(title_x, title_y, title_text)
+    
+    # Set the font and size for the smaller text
+    c.setFont("Helvetica", 10)
+    
+    # Get the PO details from meta_data
+    po_number = meta_data.get("po_number", "N/A")
+    po_date = meta_data.get("po_date", "N/A")
+
+    # Define the smaller text and its position
+    po_number_text = f"PO Number: {po_number}"
+    po_date_text = f"PO Date: {po_date}"
+    
+    po_number_x = 500  # Same horizontal position as the title
+    po_number_y = title_y - 15  # Slightly below the title
+    
+    po_date_x = 500  # Same horizontal position as the title
+    po_date_y = po_number_y - 15  # Slightly below the PO number
+    
+    # Draw the smaller text on the canvas
+    c.drawString(po_number_x, po_number_y, po_number_text)
+    c.drawString(po_date_x, po_date_y, po_date_text)
+
+
     # Set up the table headers
     table_headers = ["SKU", "Barcode", "Quantity"]
     col_widths = [150, 150, 150]
@@ -120,19 +175,6 @@ def generate_pdf(selected_products, meta_data):
     y_start = 750  # Start position of the first row
     x_start = 50   # Starting x position for the table
 
-    # Load and position company logo if available
-    company_logo_path = os.path.join(os.getcwd(), "logo.jpeg")
-    if os.path.exists(company_logo_path):
-        try:
-            logo = ImageReader(company_logo_path)
-            logo_width, logo_height = logo.getSize()
-            logo_x = (letter[0] - logo_width) / 2  # Centered horizontally
-            logo_y = letter[1] - 50  # Positioned near the top of the page
-            c.drawImage(company_logo_path, logo_x, logo_y, width=logo_width, height=logo_height)
-        except Exception as e:
-            print(f"Failed to load company logo: {e}")
-    else:
-        print(f"Company logo '{company_logo_path}' not found.")
 
     # Draw table headers
     for i, header in enumerate(table_headers):
