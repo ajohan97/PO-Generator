@@ -6,7 +6,19 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
 import os
+
+def get_string_height(text, font_name, font_size):
+    # Get the ascent and descent of the font
+    ascent = pdfmetrics.getAscent(font_name)
+    descent = pdfmetrics.getDescent(font_name)
+    
+    # Calculate the height
+    height = (ascent - descent) / 1000 * font_size
+    return height
 
 def read_spreadsheet(file_path):
 
@@ -112,7 +124,23 @@ def generate_pdf(selected_products, meta_data):
     # Create a PDF document
     pdf_file = "selected_products_report.pdf"
     c = canvas.Canvas(pdf_file, pagesize=letter)
-    
+
+    # Define margins
+    margin_width = 0.5 * 72  # 0.75 inches converted to points (72 points per inch)
+    margin_height = 0.5 * 72
+
+    # Define text sizes
+    Title1_size = 18
+    Title2_size = 15
+    Text_size = 12
+
+    #Center the image on the page
+    page_width, page_height = letter
+
+    # Get the available width and height inside the margins
+    available_width = page_width - 2 * margin_width
+    available_height = page_height -2 * margin_height
+
     # Load and position company logo if available
     company_logo_path = "logo.jpg"
     if company_logo_path:
@@ -121,12 +149,13 @@ def generate_pdf(selected_products, meta_data):
 
             #Resize the image
             logo_width, logo_height = company_logo.getSize()
-            logo_width = logo_width / 7
-            logo_height = logo_height / 7
+            logo_width = logo_width / 9
+            logo_height = logo_height / 9
 
             #Center the image on the page
             page_width, page_height = letter
-            x = (page_width - logo_width) / 2
+
+            x = (available_width - logo_width) / 2 + margin_width
             y = (page_height - logo_height)
     
             # Draw the image on the canvas
@@ -135,37 +164,66 @@ def generate_pdf(selected_products, meta_data):
         except Exception as e:
             print(f"Failed to load company logo: {e}")
 
+    # Set the font and size for the company name text
+    c.setFont("Helvetica-Bold", Title2_size)
+    
+    # Get the company details from meta_data and draw it on the PDF
+    company_name = f"{meta_data.get('company_name', 'N/A')}"
+    company_name_height = get_string_height(company_name, "Helvetica-Bold", Title2_size)
+    company_name_y = page_height - margin_height - company_name_height
+    c.drawString(margin_width, company_name_y, company_name)
+
+    # Set the font size for the company address text
+    c.setFont("Helvetica", Text_size)
+
+    # Get the company details from meta_data and draw it on the PDF
+    company_address_1 = f"{meta_data.get('company_address_1', 'N/A')}"
+    company_address_2 = f"{meta_data.get('company_address_2', 'N/A')}"
+    company_country = f"{meta_data.get('company_country', 'N/A')}"
+    
+    # Align the company details vertically
+    company_address_1_y = company_name_y - 15
+    company_address_2_y = company_address_1_y - 15
+    company_country_y = company_address_2_y - 15
+
+    # Draw the smaller text on the canvas
+    c.drawString(margin_width, company_address_1_y, company_address_1)
+    c.drawString(margin_width, company_address_2_y, company_address_2)
+    c.drawString(margin_width, company_country_y, company_country)
+
     # Set the font and size for the title text
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("Helvetica-Bold", Title1_size)
     
     # Define the title text and its position
     title_text = "PURCHASE ORDER"
-    title_x = 500  # Adjust this value for horizontal position
-    title_y = 750  # Adjust this value for vertical position
+    title_width = c.stringWidth(title_text, "Helvetica-Bold", Title1_size)
+    title_x = page_width - margin_width - title_width  # Align to the right
+    title_y_height = get_string_height(title_text, "Helvetica-Bold", Title1_size)
+    title_y = page_height - margin_height - title_y_height # Adjust this value for vertical position
     
     # Draw the title text on the canvas
     c.drawString(title_x, title_y, title_text)
     
     # Set the font and size for the smaller text
-    c.setFont("Helvetica", 10)
+    c.setFont("Helvetica", Text_size)
     
     # Get the PO details from meta_data
-    po_number = meta_data.get("po_number", "N/A")
-    po_date = meta_data.get("po_date", "N/A")
+    po_number = f"{meta_data.get('po_number', 'N/A')}"
+    po_date = f"Date: {meta_data.get('po_number', 'N/A')}"
 
-    # Define the smaller text and its position
-    po_number_text = f"PO Number: {po_number}"
-    po_date_text = f"PO Date: {po_date}"
+    po_number_width = c.stringWidth(po_number, "Helvetica", Text_size)
+    po_date_width = c.stringWidth(po_date, "Helvetica", Text_size)
+
+    # Align the smaller text to the right
+    po_number_x = page_width - margin_width - po_number_width
+    po_date_x = page_width - margin_width - po_date_width
     
-    po_number_x = 500  # Same horizontal position as the title
     po_number_y = title_y - 15  # Slightly below the title
-    
-    po_date_x = 500  # Same horizontal position as the title
     po_date_y = po_number_y - 15  # Slightly below the PO number
     
     # Draw the smaller text on the canvas
-    c.drawString(po_number_x, po_number_y, po_number_text)
-    c.drawString(po_date_x, po_date_y, po_date_text)
+    c.drawString(po_number_x, po_number_y, po_number)
+    c.drawString(po_date_x, po_date_y, po_date)
 
 
     # Set up the table headers
