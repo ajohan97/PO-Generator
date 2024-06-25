@@ -227,7 +227,6 @@ def generate_pdf(selected_products, meta_data):
     c.drawString(po_number_x, po_number_y, po_number)
     c.drawString(po_date_x, po_date_y, po_date)
 
-    # Define the table data and styles
     # Separate lines for sender and ship to data
     sender_data = [
         f"SENDER:",
@@ -247,17 +246,23 @@ def generate_pdf(selected_products, meta_data):
         f"{meta_data.get('ship_to_address_3', 'N/A')}"
     ]
 
-    table_data = [ sender_data , ship_to_data ]
+    # Combine sender and ship-to data into pairs
+    max_length = max(len(sender_data), len(ship_to_data))
+    table_data = [
+        [sender_data[i] if i < len(sender_data) else '', 
+        ship_to_data[i] if i < len(ship_to_data) else '']
+        for i in range(max_length)
+    ]
 
     # Calculate column widths dynamically
-    #sender_width = max(c.stringWidth(line, "Helvetica", 12) for line in sender_data)
-    #ship_to_width = max(c.stringWidth(line, "Helvetica", 12) for line in ship_to_data)
+    sender_width = max(c.stringWidth(line, "Helvetica", 12) for line in sender_data)
+    ship_to_width = max(c.stringWidth(line, "Helvetica", 12) for line in ship_to_data)
 
-    #total_width = sender_width + ship_to_width
-    #scaling_factor = available_width / total_width
+    total_width = sender_width + ship_to_width
+    scaling_factor = available_width / total_width
 
-    #sender_width *= scaling_factor
-    #ship_to_width *= scaling_factor
+    sender_width *= scaling_factor
+    ship_to_width *= scaling_factor
 
     # Define the table style
     table_style = TableStyle([
@@ -265,23 +270,27 @@ def generate_pdf(selected_products, meta_data):
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),   # Text color for the first row
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold font for the first row
         ('FONTSIZE', (0, 0), (-1, 0), 12),  # Font size for the first row
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 0),  # No bottom padding for the first row
-        ('TOPPADDING', (0, 0), (-1, 0), 0),     # No top padding for the first row
-        ('LEFTPADDING', (0, 0), (-1, 0), 0),    # No left padding for the first row
-        ('RIGHTPADDING', (0, 0), (-1, 0), 0),   # No right padding for the first row
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),  # No bottom padding for all rows
+        ('TOPPADDING', (0, 0), (-1, -1), 0),     # No top padding for all rows
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),    # No left padding for all rows
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),   # No right padding for all rows
     ])
 
-    table = Table(table_data)
+    table = Table(table_data, colWidths=[sender_width, ship_to_width])
     table.setStyle(table_style)
 
     # Calculate the position for the table
     table_width, table_height = table.wrap(available_width, available_height)
     table_x = margin_width
-    table_y = po_date_y - table_height - 30  # Adjust this value to control spacing
+    table_y = po_date_y - table_height - 40  # Adjust this value to control spacing
     
     # Draw the table on the canvas
     table.wrapOn(c, available_width, available_height)
     table.drawOn(c, table_x, table_y)
+
+
+
+
 
     # Set up the table headers
     table_headers = ["SKU", "Barcode", "Quantity"]
