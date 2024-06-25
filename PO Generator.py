@@ -133,8 +133,8 @@ def generate_pdf(selected_products, meta_data):
 
     # Define text sizes
     Title1_size = 18
-    Title2_size = 15
-    Text_size = 12
+    Title2_size = 14
+    Text_size = 10
 
     #Center the image on the page
     page_width, page_height = letter
@@ -288,15 +288,40 @@ def generate_pdf(selected_products, meta_data):
     table.wrapOn(c, available_width, available_height)
     table.drawOn(c, table_x, table_y)
 
+    # ------- Draw the comments---------
+    c.setFont("Helvetica-Bold", Text_size)
+    comments_y = table_y - 30
+    c.drawString(margin_width, comments_y, "COMMENTS OR SPECIAL INSTRUCTIONS")
 
+    # List of comments from meta_data
+    comments = [
+        meta_data.get('comments_1', ''),
+        meta_data.get('comments_2', ''),
+        meta_data.get('comments_3', ''),
+        meta_data.get('comments_4', ''),
+        meta_data.get('comments_5', ''),
+        meta_data.get('comments_6', ''),
+        meta_data.get('comments_7', ''),
+        meta_data.get('comments_8', ''),
+        meta_data.get('comments_9', ''),
+        meta_data.get('comments_10', '')
+    ]
 
+    # Filter out empty comments
+    comments = [comment for comment in comments if comment and comment != 'nan']
 
+    # Draw the bullet points for each comment
+    bullet_offset = 14  # Offset for the bullet points
+    c.setFont("Helvetica", Text_size)
+    for comment in comments:
+        comments_y -= 15  # Move the text position down for each bullet point
+        c.drawString(margin_width + bullet_offset, comments_y, f"• {comment}")
 
     # Set up the table headers
     table_headers = ["SKU", "Barcode", "Quantity"]
     col_widths = [150, 150, 150]
     row_height = 30
-    y_start = company_country_y - 150  # Start position of the first row
+    y_start = comments_y - 50  # Start position of the first row
     x_start = 50   # Starting x position for the table
 
     # Draw table headers
