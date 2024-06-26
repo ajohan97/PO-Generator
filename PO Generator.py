@@ -10,6 +10,9 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from PIL import Image
 
 import os
 
@@ -135,6 +138,9 @@ def generate_pdf(selected_products, meta_data):
     Title1_size = 18
     Title2_size = 14
     Text_size = 10
+
+    # Define line spacing
+    line_spacing = 2
 
     #Center the image on the page
     page_width, page_height = letter
@@ -292,6 +298,7 @@ def generate_pdf(selected_products, meta_data):
     c.setFont("Helvetica-Bold", Text_size)
     comments_y = table_y - 30
     c.drawString(margin_width, comments_y, "COMMENTS OR SPECIAL INSTRUCTIONS")
+    #comments_y -= 5
 
     # List of comments from meta_data
     comments = [
@@ -307,45 +314,166 @@ def generate_pdf(selected_products, meta_data):
         meta_data.get('comments_10', '')
     ]
 
-    # Filter out empty comments
-    comments = [comment for comment in comments if comment and comment != 'nan']
+    # Convert all comments to strings and filter out empty or 'nan' comments
+    filtered_comments = [str(comment) for comment in comments if str(comment).strip() and str(comment).lower() != 'nan']
+
+    # Create a style for the comments
+    styles = getSampleStyleSheet()
+    bullet_style = ParagraphStyle(
+        'Bullet',
+        parent=styles['BodyText'],
+        leftIndent=20,       # Offset for all lines
+        firstLineIndent=-6,  # Negative offset to bring bullet back
+        spaceBefore=0,       # No space before the paragraph
+        spaceAfter=2,        # No space after the paragraph
+        leading=12           # Line height
+    )
 
     # Draw the bullet points for each comment
-    bullet_offset = 14  # Offset for the bullet points
-    c.setFont("Helvetica", Text_size)
-    for comment in comments:
-        comments_y -= 15  # Move the text position down for each bullet point
-        c.drawString(margin_width + bullet_offset, comments_y, f"• {comment}")
+    for comment in filtered_comments:
+        para = Paragraph(f"• {comment}", bullet_style)
+        width, height = para.wrap(available_width, available_height)  # Measure the width and height of the paragraph
+        comments_y -= (height + bullet_style.spaceAfter)  # Adjust the position for the next comment
+        para.drawOn(c, margin_width, comments_y)
+
+    #-----------SKU TABLE-----------
+
+    c.setFont("Helvetica-Bold", Text_size)
 
     # Set up the table headers
-    table_headers = ["SKU", "Barcode", "Quantity"]
-    col_widths = [150, 150, 150]
-    row_height = 30
+    table_headers = ["ITEM #", "QTY", "Description", "Sample", "Barcode", "Total (USD)"]
+
+    item_no_col_width = 40
+    qty_col_width = 30
+    description_col_width = 260
+    sample_image_col_width = 75
+    barcode_col_width = 75
+    total_col_width = 60
+
+    col_widths = [item_no_col_width, qty_col_width, description_col_width, sample_image_col_width, barcode_col_width, total_col_width]
+    header_height = 25
+    row_height = 50
+    font_height = get_string_height("This is a test", "Helvetica", Text_size)  # Example usage, replace with actual font and size
     y_start = comments_y - 50  # Start position of the first row
-    x_start = 50   # Starting x position for the table
+    x_start = margin_width  # Starting x position for the table
 
     # Draw table headers
     for i, header in enumerate(table_headers):
-        c.drawString(x_start + sum(col_widths[:i]), y_start, header)
+        # Calculate center position for each header
+        header_width = c.stringWidth(header)  # Get the width of the header string
+        header_x = x_start + sum(col_widths[:i]) + (col_widths[i] - header_width) / 2
+        c.drawString(header_x, y_start + (header_height - font_height) / 2, header)
     
-    # Draw a line under the headers
-    c.line(x_start, y_start-5, sum(col_widths) + x_start, y_start-5)
+    c.setFont("Helvetica", Text_size)
 
+    # Draw a line above the headers
+    c.line(x_start, y_start + header_height, sum(col_widths) + x_start, y_start + header_height)
+
+    # Draw a line under the headers
+    c.line(x_start, y_start, sum(col_widths) + x_start, y_start)
+    line_spacing = 5
     # Print each selected SKU, barcode, and quantity in the PDF
-    for idx, (sku, barcode, qty) in enumerate(selected_products, start=1):
-        y_pos = y_start - idx * row_height
-        c.drawString(x_start, y_pos, sku)
-        c.drawString(x_start + col_widths[0], y_pos, str(barcode))
-        c.drawString(x_start + col_widths[0] + col_widths[1], y_pos, qty)
-    
-    # Print meta data
-    #c.setFont("Helvetica-Bold", 12)
-    #c.drawString(x_start, y_pos - 50, "Metadata:")
-    #c.setFont("Helvetica", 10)
-    #y_pos -= 20
-    #for key, value in meta_data.items():
-    #    c.drawString(x_start, y_pos, f"{value}")
-    #    y_pos -= 15
+    for idx, (qty, sku, title, barcode) in enumerate(selected_products, start=1):
+        y_pos = y_start - idx * row_height  # Center vertically
+
+        # Description split into two parts
+        description_part1 = f'{title}.'
+        description_part2 = f'See attachment "{sku}.png"'
+
+        # Calculate positions for each line of the description with extra space
+        description_y_pos1 = y_pos + (row_height - 2 * font_height - line_spacing) / 2 + font_height + line_spacing/2  # First line
+        description_y_pos2 = y_pos + (row_height - 2 * font_height - line_spacing) / 2 # Second line
+
+         # Item Number
+        c.drawString(x_start + (col_widths[0] - c.stringWidth(str(idx))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(idx))
+        
+        # Quantity
+        c.drawString(x_start + col_widths[0] + (col_widths[1] - c.stringWidth(str(qty))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(qty))
+        
+        # Description - First Line (Title) (Not centered horizontally)
+        c.drawString(x_start + col_widths[0] + col_widths[1] + 5, description_y_pos1 + font_height / 4, description_part1)
+
+        # Description - Second Line (See attachment {sku}.png) (Not centered horizontally)
+        c.drawString(x_start + col_widths[0] + col_widths[1] + 5, description_y_pos2 + font_height / 4, description_part2)
+
+        # Sample Image
+        image_path = f"assets/{sku}.jpg"
+        try:
+            with Image.open(image_path) as img:
+                img_width, img_height = img.size
+                
+                # Calculate scaling factor
+                scale_factor = min(sample_image_col_width / img_width, row_height / img_height)
+                
+                # Calculate new dimensions
+                new_width = img_width * scale_factor
+                new_height = img_height * scale_factor
+                
+                # Calculate positions to center the image
+                image_x = x_start + col_widths[0] + col_widths[1] + col_widths[2] + (col_widths[3] - new_width) / 2
+                image_y = y_pos + (row_height - new_height) / 2
+                
+                # Draw the image
+                c.drawImage(image_path, image_x, image_y, width=new_width, height=new_height, preserveAspectRatio=True)
+        except IOError:
+            # Handle the case where the image does not exist
+            c.drawString(x_start + col_widths[0] + col_widths[1] + col_widths[2] + (col_widths[3] - c.stringWidth("No Image")) / 2, y_pos + (row_height - font_height) / 2, "No Image")
+
+        # Barcode
+        #Save the barcode x position for later when printing the summary data
+        barcode_pos_x = x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + col_widths[4] 
+        c.drawString(x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + (col_widths[4] - c.stringWidth(str(barcode))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(barcode))
+
+        # Total
+        # Leave the total empty for now
+        # c.drawString(x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + col_widths[4] + (col_widths[5] - c.stringWidth(str(idx))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(idx))
+
+        # Draw horizontal line for each row
+        c.line(x_start, y_pos, sum(col_widths) + x_start, y_pos)
+
+    # Draw vertical lines for the grid
+    for i in range(len(col_widths) + 1):
+        
+        x_pos = x_start + sum(col_widths[:i])
+        c.line(x_pos, y_start + header_height, x_pos, y_start - row_height * len(selected_products))
+        
+
+    #----------- Additional Items -----------
+    final_row_height = 15
+    additional_items = [
+        "SUBTOTAL",
+        "SALES TAX",
+        "WARNING STICKERS, BARCODE STICKERS, AND OPAQUE POLY BAG + LABOR",
+        "SHIPPING",
+        "TRANSACTION FEE",
+        "TOTAL"
+    ]
+
+    # Calculate starting y position for the additional items
+    items_start_y = y_pos - final_row_height # Adjust for spacing below the table
+
+    # Draw the additional items
+    for idx, item in enumerate(additional_items):
+        item_y_pos = items_start_y - idx * final_row_height  # Calculate y position for each item
+
+        # Calculate the x position to align the item to the right side of the page
+        item_width = c.stringWidth(item)
+        item_x_pos = barcode_pos_x - item_width - 5 # Add 5 buffer
+
+        # Draw the item name
+        c.drawString(item_x_pos, item_y_pos + (final_row_height - font_height) / 2, item)
+
+        # Draw lines to separate items
+        c.line(barcode_pos_x, item_y_pos, margin_width + available_width, item_y_pos)
+
+    # Draw lines to the left and right of the lines we just drew to make boxes
+    c.line(barcode_pos_x, y_pos, barcode_pos_x, item_y_pos)
+    c.line(margin_width + available_width, y_pos, margin_width + available_width, item_y_pos)
+
+    # Draw a final line below the last additional item
+    # c.line(availabe_width, item_y_pos - final_row_height, sum(col_widths) + x_start, item_y_pos - final_row_height)
+
+
     
     # Save the PDF file
     c.save()
@@ -365,12 +493,13 @@ def main():
 
                 selected_product = curses.wrapper(get_user_input, data_set)
                 selected_product_sku = selected_product["SKU"]
+                selected_product_title = selected_product["Title"]
                 selected_product_barcode = selected_product["Barcode"]
                 # Get quantity input from user
                 selected_product_quantity = input(f"Enter Quantity for SKU {selected_product_sku}: ")
                 
                 # Store the SKU, barcode, and quantity in a list
-                selected_products.append((selected_product_sku, selected_product_barcode, selected_product_quantity))
+                selected_products.append((selected_product_quantity, selected_product_sku, selected_product_title, selected_product_barcode))
                 
                 # Ask user if they want to add another SKU or finish
                 choice = input("Enter 1 to add another SKU or 2 to finish: ")
@@ -379,7 +508,7 @@ def main():
         
             # Print all selected SKUs, quantities, and barcodes
             print("Selected SKUs, Barcodes, and Quantities:")
-            for idx, (sku, barcode, qty) in enumerate(selected_products, start=1):
+            for idx, (sku, title, barcode, qty) in enumerate(selected_products, start=1):
                 print(f"{idx}. SKU: {sku}, Barcode: {barcode}, Quantity: {qty}")
             
             # Generate PDF report
@@ -391,5 +520,4 @@ def main():
         print("No file selected, exiting.")
 
 # Entry point
-if __name__ == "__main__":
-    main()
+main()
