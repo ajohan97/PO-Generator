@@ -13,6 +13,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from PIL import Image
+import shutil
 
 import os
 
@@ -127,7 +128,8 @@ def get_user_input(screen, skus):
 
 def generate_pdf(selected_products, meta_data):
     # Create a PDF document
-    pdf_file = "selected_products_report.pdf"
+    po_number = f"{meta_data.get('po_number', 'N/A')}"
+    pdf_file = f"{po_number}.pdf"
     c = canvas.Canvas(pdf_file, pagesize=letter)
 
     # Define margins
@@ -142,6 +144,10 @@ def generate_pdf(selected_products, meta_data):
     # Define line spacing
     line_spacing = 2
 
+    def add_new_page():
+        c.showPage()
+        c.setFont("Helvetica", Text_size)
+
     #Center the image on the page
     page_width, page_height = letter
 
@@ -150,7 +156,7 @@ def generate_pdf(selected_products, meta_data):
     available_height = page_height -2 * margin_height
 
     # Load and position company logo if available
-    company_logo_path = "logo.jpg"
+    company_logo_path = "assets\\logo.jpg"
     if company_logo_path:
         try:
             company_logo = ImageReader(company_logo_path)
@@ -372,9 +378,36 @@ def generate_pdf(selected_products, meta_data):
     # Draw a line under the headers
     c.line(x_start, y_start, sum(col_widths) + x_start, y_start)
     line_spacing = 5
+    page_count = 1
+    relative_height = 1
+
     # Print each selected SKU, barcode, and quantity in the PDF
     for idx, (qty, sku, title, barcode) in enumerate(selected_products, start=1):
-        y_pos = y_start - idx * row_height  # Center vertically
+    
+        y_pos = y_start - relative_height * row_height   # Center vertically
+
+        #If the table would extend into the margin of the existing pages, add a new page
+        if y_pos < (margin_height):
+
+
+            # Draw vertical lines for the grid
+            for i in range(len(col_widths) + 1):
+                
+                x_pos = x_start + sum(col_widths[:i])
+                c.line(x_pos, y_start + header_height, x_pos, y_start - row_height * (relative_height - 1))
+            
+            # Print page number on previous page
+            c.drawString((page_width - 2 * margin_width), margin_height / 2 + get_string_height("Page", "Helvetica", Text_size) / 2, f"Page {page_count}")
+
+            add_new_page()
+            page_count = page_count +1
+            relative_height = 0
+            y_start = page_height - margin_height - 1.5 * row_height
+            y_pos = y_start
+
+            #Draw vertical line at the top of the next page
+            c.line(x_start, y_pos + row_height, sum(col_widths) + x_start, y_pos + row_height)
+
 
         # Description split into two parts
         description_part1 = f'{title}.'
@@ -431,11 +464,20 @@ def generate_pdf(selected_products, meta_data):
         # Draw horizontal line for each row
         c.line(x_start, y_pos, sum(col_widths) + x_start, y_pos)
 
+        # Increment relative_height
+        relative_height = relative_height + 1
+
     # Draw vertical lines for the grid
     for i in range(len(col_widths) + 1):
         
         x_pos = x_start + sum(col_widths[:i])
-        c.line(x_pos, y_start + header_height, x_pos, y_start - row_height * len(selected_products))
+
+        # If we are not on the first page, don't use the header_height and
+        # len(selected_products) to determine where to draw the vertical lines
+        if page_count == 1:
+            c.line(x_pos, y_start + header_height, x_pos, y_start - row_height * len(selected_products))
+        else:
+            c.line(x_pos, y_start + row_height, x_pos, y_start - row_height * (relative_height - 1))
         
 
     #----------- Additional Items -----------
@@ -473,11 +515,55 @@ def generate_pdf(selected_products, meta_data):
     # Draw a final line below the last additional item
     # c.line(availabe_width, item_y_pos - final_row_height, sum(col_widths) + x_start, item_y_pos - final_row_height)
 
+    # Draw the page number
+    c.drawString((page_width - 2 * margin_width), margin_height / 2 + get_string_height("Page", "Helvetica", Text_size) / 2, f"Page {page_count}")
 
-    
     # Save the PDF file
     c.save()
     print(f"PDF report generated: {pdf_file}")
+
+def create_output_folder(selected_products, meta_data):
+
+    source_folder = "assets"
+    destination_folder = "outputs"
+
+    po_number = f"{meta_data.get('po_number', 'N/A')}"
+
+
+    try:
+        # Check if the source folder exists
+        if not os.path.exists(source_folder):
+            print(f"Source folder '{source_folder}' does not exist.")
+            return
+        
+        # Create a new folder with the PO number within the destination folder
+        new_folder_name = po_number
+        new_folder_path = os.path.join(destination_folder, new_folder_name)
+        os.makedirs(new_folder_path, exist_ok=True)
+        
+        # Get list of files in the source folder
+        files = os.listdir(source_folder)
+        
+        for product, (qty, sku, title, barcode) in enumerate(selected_products, start=1):
+            # Copy the SKU design
+            source_file = os.path.join(source_folder, f"{sku}.jpg")
+            destination_file = os.path.join(new_folder_path,  f"{sku}.jpg")
+            shutil.copy2(source_file, destination_file)  # Copy the file
+
+            # Copy the barcode
+            source_file = os.path.join(source_folder, f"{barcode}.png")
+            destination_file = os.path.join(new_folder_path,  f"{barcode}.png")
+            shutil.copy2(source_file, destination_file)  # Copy the file
+        
+        # Move the new PDF we generated
+        destination_file = os.path.join(new_folder_path,  f"{po_number}.pdf")
+        shutil.move(f"{po_number}.pdf", destination_file)  # Move the file
+
+        print(f"Files copied from '{source_folder}' to '{new_folder_path}' successfully.")
+    
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
 
 def main():
     #file_path = open_file_dialog()
@@ -513,6 +599,9 @@ def main():
             
             # Generate PDF report
             generate_pdf(selected_products, meta_data)
+
+            
+            create_output_folder(selected_products, meta_data)
 
         except ValueError as e:
             print(e)
