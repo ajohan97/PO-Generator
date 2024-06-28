@@ -54,7 +54,7 @@ def read_spreadsheet(file_path):
                 
             # Define categories to read from the second sheet
             meta_categories = [
-                'po_number', 'po_date', 'ship_to_name', 'ship_to_address_1', 'ship_to_address_2',
+                'po_number', 'po_date', 'subtotal',	'shipping',	'transaction_fee',	'total', 'ship_to_name', 'ship_to_address_1', 'ship_to_address_2',
                 'ship_to_address_3', 'comments_1', 'comments_2', 'comments_3', 'comments_4',
                 'comments_5', 'comments_6', 'comments_7', 'comments_8', 'comments_9', 'comments_10',
                 'company_name', 'company_address_1', 'company_address_2', 'company_country',
@@ -389,7 +389,6 @@ def generate_pdf(selected_products, meta_data):
         #If the table would extend into the margin of the existing pages, add a new page
         if y_pos < (margin_height):
 
-
             # Draw vertical lines for the grid
             for i in range(len(col_widths) + 1):
                 
@@ -458,6 +457,8 @@ def generate_pdf(selected_products, meta_data):
         c.drawString(x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + (col_widths[4] - c.stringWidth(str(barcode))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(barcode))
 
         # Total
+        # Save the x position of this for later
+        total_x_pos = x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + col_widths[4] + (col_widths[5] - c.stringWidth(str(idx))) / 2
         # Leave the total empty for now
         # c.drawString(x_start + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + col_widths[4] + (col_widths[5] - c.stringWidth(str(idx))) / 2, y_pos + (row_height - font_height) / 2 + font_height / 4, str(idx))
 
@@ -492,25 +493,82 @@ def generate_pdf(selected_products, meta_data):
     ]
 
     # Calculate starting y position for the additional items
-    items_start_y = y_pos - final_row_height # Adjust for spacing below the table
+    items_start_y = y_pos #- final_row_height # Adjust for spacing below the table
+
+    relative_index = 1
 
     # Draw the additional items
     for idx, item in enumerate(additional_items):
-        item_y_pos = items_start_y - idx * final_row_height  # Calculate y position for each item
+        # Calculate y position for each item
+        item_y_pos = items_start_y - relative_index * final_row_height  
+
+        #If the table would extend into the margin of the existing pages, add a new page
+        if item_y_pos < (margin_height):
+
+            # Draw lines to the left and right of the lines we just drew to make boxes
+            c.line(barcode_pos_x, y_pos, barcode_pos_x, item_y_pos + final_row_height)
+            c.line(margin_width + available_width, y_pos, margin_width + available_width, item_y_pos + final_row_height)
+
+            # Print page number on previous page
+            c.drawString((page_width - 2 * margin_width), margin_height / 2 + get_string_height("Page", "Helvetica", Text_size) / 2, f"Page {page_count}")
+
+            add_new_page()
+            page_count = page_count +1
+            relative_index = 0
+
+            #Need to reset items_start_y and item_y_pos because the former is used to calculate the latter
+            items_start_y = page_height - margin_height - 1.5 * final_row_height
+            item_y_pos = items_start_y
+
+        buffer = 5
 
         # Calculate the x position to align the item to the right side of the page
         item_width = c.stringWidth(item)
-        item_x_pos = barcode_pos_x - item_width - 5 # Add 5 buffer
+        item_x_pos = barcode_pos_x - item_width - buffer # Add 5 buffer
 
         # Draw the item name
         c.drawString(item_x_pos, item_y_pos + (final_row_height - font_height) / 2, item)
 
+        if item == 'SUBTOTAL':
+            subtotal = meta_data.get('subtotal', 'N/A')
+            subtotal = f"{subtotal:.2f}"
+            c.drawString(total_x_pos - c.stringWidth(str(subtotal))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(subtotal))
+        elif item == 'SALES TAX':
+            sales_tax = "EXEMPT"
+            c.drawString(total_x_pos - c.stringWidth(str(sales_tax))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(sales_tax))
+        elif item == 'WARNING STICKERS, BARCODE STICKERS, AND OPAQUE POLY BAG + LABOR':
+            sticks_and_labor = "INCL"
+            c.drawString(total_x_pos - c.stringWidth(str(sticks_and_labor))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(sticks_and_labor))
+        elif item == 'SHIPPING':
+            shipping = meta_data.get('shipping', 'N/A')
+            shipping = f"{shipping:.2f}"
+            c.drawString(total_x_pos - c.stringWidth(str(shipping))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(shipping))
+        elif item == 'TRANSACTION FEE':
+            transaction_fee = meta_data.get('transaction_fee', 'N/A')
+            transaction_fee = f"{transaction_fee:.2f}"
+            c.drawString(total_x_pos - c.stringWidth(str(transaction_fee))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(transaction_fee))
+        elif item == 'TOTAL':
+            total = meta_data.get('total', 'N/A')
+            total = f"{total:.2f}"
+            c.drawString(total_x_pos - c.stringWidth(str(total))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(total))
+
         # Draw lines to separate items
         c.line(barcode_pos_x, item_y_pos, margin_width + available_width, item_y_pos)
 
-    # Draw lines to the left and right of the lines we just drew to make boxes
-    c.line(barcode_pos_x, y_pos, barcode_pos_x, item_y_pos)
-    c.line(margin_width + available_width, y_pos, margin_width + available_width, item_y_pos)
+        relative_index = relative_index + 1
+
+
+    if page_count == 1:
+        # Draw lines to the left and right of the lines we just drew to make boxes
+        c.line(barcode_pos_x, y_pos, barcode_pos_x, item_y_pos)
+        c.line(margin_width + available_width, y_pos, margin_width + available_width, item_y_pos)
+    else:
+        # Draw line across the top box
+        c.line(barcode_pos_x, items_start_y + final_row_height, margin_width + available_width, items_start_y + final_row_height)
+
+        # Draw lines to the left and right of the lines we just drew to make boxes
+        c.line(barcode_pos_x, items_start_y + final_row_height, barcode_pos_x, item_y_pos)
+        c.line(margin_width + available_width, items_start_y + final_row_height, margin_width + available_width, item_y_pos)
 
     # Draw a final line below the last additional item
     # c.line(availabe_width, item_y_pos - final_row_height, sum(col_widths) + x_start, item_y_pos - final_row_height)
