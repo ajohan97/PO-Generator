@@ -603,10 +603,13 @@ def create_output_folder(selected_products, meta_data):
         files = os.listdir(source_folder)
         
         for product, (qty, sku, title, barcode) in enumerate(selected_products, start=1):
+            
+            # Don't need to copy the SKU image to the output folder
+
             # Copy the image of the SKU for printing on the Purchase Order
-            source_file = os.path.join(source_folder, f"{sku}.jpg")
-            destination_file = os.path.join(new_folder_path,  f"{sku}.jpg")
-            shutil.copy2(source_file, destination_file)  # Copy the file
+            # source_file = os.path.join(source_folder, f"{sku}.jpg")
+            # destination_file = os.path.join(new_folder_path,  f"{sku}.jpg")
+            # shutil.copy2(source_file, destination_file)  # Copy the file
 
             # Copy the barcode
             source_file = os.path.join(source_folder, f"{barcode}.png")
