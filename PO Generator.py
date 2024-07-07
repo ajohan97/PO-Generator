@@ -410,7 +410,7 @@ def generate_pdf(selected_products, meta_data):
 
         # Description split into two parts
         description_part1 = f'{title}.'
-        description_part2 = f'See attachment "{sku}.png"'
+        description_part2 = f'See attachment "{sku}_DESIGN.png"'
 
         # Calculate positions for each line of the description with extra space
         description_y_pos1 = y_pos + (row_height - 2 * font_height - line_spacing) / 2 + font_height + line_spacing/2  # First line
@@ -603,7 +603,7 @@ def create_output_folder(selected_products, meta_data):
         files = os.listdir(source_folder)
         
         for product, (qty, sku, title, barcode) in enumerate(selected_products, start=1):
-            # Copy the SKU design
+            # Copy the image of the SKU for printing on the Purchase Order
             source_file = os.path.join(source_folder, f"{sku}.jpg")
             destination_file = os.path.join(new_folder_path,  f"{sku}.jpg")
             shutil.copy2(source_file, destination_file)  # Copy the file
@@ -611,6 +611,11 @@ def create_output_folder(selected_products, meta_data):
             # Copy the barcode
             source_file = os.path.join(source_folder, f"{barcode}.png")
             destination_file = os.path.join(new_folder_path,  f"{barcode}.png")
+            shutil.copy2(source_file, destination_file)  # Copy the file
+
+            # Copy the drawing/design for the SKU
+            source_file = os.path.join(source_folder, f"{sku}_DESIGN.png")
+            destination_file = os.path.join(new_folder_path,  f"{sku}_DESIGN.png")
             shutil.copy2(source_file, destination_file)  # Copy the file
         
         # Move the new PDF we generated
