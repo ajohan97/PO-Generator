@@ -14,7 +14,7 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from PIL import Image
 import shutil
-
+from datetime import datetime
 import os
 
 def get_string_height(text, font_name, font_size):
@@ -223,7 +223,28 @@ def generate_pdf(selected_products, meta_data):
     
     # Get the PO details from meta_data
     po_number = f"{meta_data.get('po_number', 'N/A')}"
-    po_date = f"Date: {meta_data.get('po_number', 'N/A')}"
+
+    # Extract the 'po_date' value, if it exists, otherwise use 'N/A'
+    po_date_ts = meta_data.get('po_date', 'N/A')
+
+    if po_date_ts != 'N/A':
+        if not isinstance(po_date_ts, str):
+            # Convert Timestamp to string
+            po_date_str = po_date_ts.strftime('%Y-%m-%dT%H:%M:%SZ')
+        else:
+            po_date_str = po_date_ts
+        
+        # Parse the date string to a datetime object
+        po_date_dt = datetime.strptime(po_date_str, '%Y-%m-%dT%H:%M:%SZ')
+        
+        # Format the date to 'MONTH DAY YEAR'
+        po_date_formatted = po_date_dt.strftime('%B %d %Y').upper()
+    else:
+        po_date_formatted = 'N/A'
+
+    # Prepare the final string
+    po_date = f"Date: {po_date_formatted}"
+    # po_date = f"Date: {meta_data.get('po_date', 'N/A')}"
 
     po_number_width = c.stringWidth(po_number, "Helvetica", Text_size)
     po_date_width = c.stringWidth(po_date, "Helvetica", Text_size)
