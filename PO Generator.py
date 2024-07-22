@@ -562,8 +562,13 @@ def generate_pdf(selected_products, meta_data):
             c.drawString(total_x_pos - c.stringWidth(str(sticks_and_labor))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(sticks_and_labor))
         elif item == 'SHIPPING':
             shipping = meta_data.get('shipping', 'N/A')
-            shipping = f"{shipping:.2f}"
-            c.drawString(total_x_pos - c.stringWidth(str(shipping))/2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(shipping))
+            # Hand the case where shipping is 'INCL'
+            if isinstance(shipping, str) and shipping.upper() == 'INCL':
+                shipping = 'INCL'
+            else:
+                shipping = f"{shipping:.2f}"
+            
+            c.drawString(total_x_pos - c.stringWidth(str(shipping)) / 2 + buffer, item_y_pos + (final_row_height - font_height) / 2, str(shipping))
         elif item == 'TRANSACTION FEE':
             transaction_fee = meta_data.get('transaction_fee', 'N/A')
             transaction_fee = f"{transaction_fee:.2f}"
